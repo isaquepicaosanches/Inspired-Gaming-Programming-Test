@@ -1,0 +1,210 @@
+<html>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js" type="text/javascript"></script>
+<script src="fw.js"></script>
+
+<style>
+#container{text-align: center;}
+#main{display: inline-block;}
+</style>
+
+<body style="background-color:white;">
+<div id="container">
+  <div id="main">
+    <canvas id="fwCanvas" width="1024" height="768"></canvas>
+  </div>
+</div>
+
+<script>
+//read xml
+var fireworks = new Array ();
+ReadXML("fireworks.xml");
+
+//set canvas
+var c = document.getElementById("fwCanvas");
+var width = c.width, height = c.height; // width and height of the canvas
+var canvas=c.getContext("2d");
+
+
+//set sprites
+var redPixel = new Image(), greenPixel = new Image(), bluePixel = new Image();
+redPixel.src = "spriteR.png";
+greenPixel.src = "spriteG.png";
+bluePixel.src = "spriteB.png";
+
+//engine
+var period = 0.05, // time between frames / fixed frame delta time
+frameCount = 0, // total frame counter
+timer = 0, //chronometer
+totalTime = 10*60; //total time
+var frames = setFrames();
+
+setInterval(engine, period*1000);
+
+//set line
+
+function setFrames(){ //this function generates all frame states
+  var frameStates = new Array(),  explosions = new Array(),  frequency = parseInt(totalTime / period),
+  cosmetics = [2, 1.5, 0.59, 0.77, 0.33, 0.4];//hardcoded movement proportions for cosmetic purposes only
+
+  var trailDelay = 0.5, subExplosionMin = 10, subExplosionMax = 22;
+
+
+  for (i = 0; i < frequency; i++){ // sets the frames array to 0 projectiles and to black background
+    var projectiles = new Array ();
+    frameStates[i] = new Frame(null, projectiles, "black");
+  }
+  for (n = 0; n < fireworks.length; n++) //sets explosion count to 0
+    explosions[n] = false;
+
+  for (i = 0; i < frequency; i++){
+    time = i*period; //the timemark of the frame
+    for (n = 0; n < fireworks.length; n++){
+
+      var start = (fireworks[n].begin)/1000, //the time at which the projectile starts
+      lifespan = (fireworks[n].duration)/1000, //the lifespan of the projectile
+      magn = time - start, // the lifetime of the projectile / the magnitude travelled by the projectile
+      end = start + lifespan, //the time at which the projectile ends
+      isRocket = fireworks[n].rocket,
+      colour = fireworks[n].colour;
+      size = isRocket? 1.7 : 1, // the proportions the projectile on the canvas is hardcoded to 1
+      explosionTime = isRocket? 0.2 : 0.2; // the explosion time is hardcoded to 0.2 for rockets and 0.2 for fountains
+
+      if (time >= start && time <= end){ //checks if the firework should be on canvas
+
+        var x = (0)+((fireworks[n].velocity[0])*magn), //the x coordinate of the projectile
+        y = (0)+((fireworks[n].velocity[1])*magn), //the y coordinate of the projectile
+        type = isRocket? "rocketlike" : "fountainlike",
+        p = new Projectile(type, x, y, size, colour, magn, lifespan, explosionTime);
+        frameStates[i].projectiles.push(p); //add projectile to frame
+
+        if (type == "rocketlike"){
+          var trailLength = parseInt(trailDelay / period);//number of frames for trail
+          for (t = 1; t <= trailLength; t++){//sets rocket trail
+            p = new Projectile("trail", x, y, size, colour, 0, 0, 0);
+            frameStates[i+t].projectiles.push(p); //add projectile to later frames
+          }
+          //explosions and subexplosions
+          if (time >= end - explosionTime && !explosions[n]){
+                explosions[n] = true; //rocket has exploded
+                frameStates[i].backgroundColor = "white"; //sets the canvas background to white in this frame
+
+                var vMagn = Math.sqrt(Math.pow(fireworks[n].velocity[0],2)+Math.pow(fireworks[n].velocity[1],2)), // magnitude of rocket velocity
+                subExplosionNR = parseInt(lerp(subExplosionMin,subExplosionMax,Math.random())); //random number of subexplosions after the rocket explodes
+
+                var angle, sx, sy, subExplosionLength = trailLength*cosmetics[0];//subexplosion variables
+                for (k1 = 0; k1 < subExplosionNR; k1++){
+                    angle = Math.PI*Math.random()*2, // subexplsion projectile direction is random in 360º
+                    sx = Math.cos(angle)*vMagn*period*cosmetics[1], //subexplosion projectiles horizontal speed
+                    sy = Math.sin(angle)*vMagn*period*cosmetics[1]; //subexplosion projectlies vertical speed
+                    for (k2 = 1; k2 <= subExplosionLength; k2++){
+                      //subexplosions
+                      p = new Projectile(type,  x+(sx*k2), y+(sy*k2), size*cosmetics[2], colour, 0, 1, 0); 
+                      frameStates[i+k2].projectiles.push(p);
+                      //subexplosion trail
+                      p = new Projectile("trail",  x+(sx*k2), y+(sy*k2), size*cosmetics[2], colour, 0, 1, 0); 
+                      for (k3 = 1; k3 <= trailLength/3; k3++)
+                        frameStates[i+k2+k3].projectiles.push(p);
+                      //cosmetic trail ray
+                      p = new Projectile("trail",  x+(sx*k2), y+(sy*k2), size*cosmetics[3], colour, 0, 1, 0); 
+                      frameStates[i+1].projectiles.push(p);       
+                    }
+                }
+                subExplosionNR = parseInt(lerp(subExplosionMin,subExplosionMax,Math.random())); //random number falling subprojectiles
+                for (k1 = 0; k1 < subExplosionNR; k1++){
+                    angle = -Math.PI*Math.random(), // falling subprojectiles only go downwards (180º to 360º)
+                    sx = Math.cos(angle)*vMagn*period*cosmetics[4], //falling subprojectlies vertical speed
+                    sy = Math.sin(angle)*vMagn*period*cosmetics[4]; //falling subprojectlies vertical speed
+                    for (k2 = 1; k2 <= subExplosionLength; k2++){
+                      //falling projectiles
+                      p = new Projectile(type,  x+(sx*k2), y+(sy*k2), size*cosmetics[5], colour, 0, 1, 0);
+                      frameStates[i+k2].projectiles.push(p);
+                    }
+                }        
+          }
+        }
+        if (type == "fountainlike"){
+        }
+      }
+    }
+    frameStates[i].time = time;
+  }
+  return frameStates;
+}
+
+function engine(){
+  updateClock();
+  clearCanvas();
+
+  var projectiles = frames[frameCount].projectiles;
+  for (i = 0; i < projectiles.length; i++){ //checks every projectile to drawn on the canvas
+
+    var type = projectiles[i].type, //the type of the projectile
+    x = projectiles[i].pos[0], //the x coordinate of the projectile
+    y = projectiles[i].pos[1], //the y coordinate of the projectile
+    size = projectiles[i].size, //the size of the projectile
+    colour = projectiles[i].colour;
+    /*
+    if (type == "rocketlike")
+      fireworkA (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
+    if (type == "trail")
+      fireworkB(x, y, size, colour);
+    */
+    
+  }
+
+
+  /*
+  //basic example of the use of light and particle functions
+  drawGradient(0, 35, 300, '0xFF20FF'); // a big light is drawn
+  drawLights(0, 35, 260, 4, 50, '0xFF20FF'); // a set of 50 lights is drawn
+  spawnParticles(0, 35, 55, 2, 100, '0xFF20FF'); //a set of 100 particles is drawn on top
+  drawLights(0, 35, 260, 4, 50, '0xFF20FF'); //a set of 50 particles is drawn on top
+  */
+}
+
+//
+// ENGINE GFX
+//
+
+function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
+  if (presentTime <= lifespan){
+
+    var explosionTime = lifespan - explosion; // the time checkpoint at which the explosion sets off
+    var cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded particle proportions for cosmetic purposes only
+
+    if (presentTime >= explosionTime){ //if exploded
+      var lightgrowth = lerp(cosmetics[0]*size, cosmetics[1]*size, ((presentTime - explosionTime)/(lifespan - explosionTime))); 
+      drawGradient(x, y, lightgrowth, colour); //draws light halo / gradient
+      drawLights(x, y, lightgrowth, cosmetics[2], cosmetics[3], colour);//draws light flares
+    }
+    else
+      spawnParticles(x, y, cosmetics[4]*size, cosmetics[5]*size, cosmetics[6]*size, colour);
+  }
+}
+
+function fireworkB(x, y, size, colour){
+    var cosmetics = [15, 2.25, 0.375]; //hardcoded particle proportions for cosmetic purposes only
+    spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
+}
+
+//
+// MISC UTILITIES
+//
+
+function updateClock(){
+  //console.log("frame: "+frameCount+ " / time: "+timer) //for debugging
+  timer += period;
+  frameCount++;
+}
+
+function lerp(a, b, t) {
+  return (a + t * (b - a));
+}
+
+
+
+
+</script>
+
+</body>
+</html>
