@@ -35,30 +35,34 @@ bluePixel.src = "spriteB.png";
 var period = 0.05, // time between frames / fixed frame delta time
 frameCount = 0, // total frame counter
 timer = 0, //chronometer
-totalTime = 10*60; //total time
-var frames = setFrames();
+totalTime = 10*60, //total time
+frames = setFrames();
 
 setInterval(engine, period*1000);
 
-//set line
 
 function setFrames(){ //this function generates all frame states
-  var frameStates = new Array(),  explosions = new Array(),  frequency = parseInt(totalTime / period),
+
+  //this solution for particle GFX generates every frame beforehand
+  //the function returns a description of every frame, to later be rendered on a HTML5 canvas
+  //this approach is a workaround to prevent slowdown
+
+  var frameStates = new Array(),  explosions = new Array(),  totalFrames = parseInt(totalTime / period),
   cosmetics = [2, 1.5, 0.59, 0.77, 0.33, 0.4];//hardcoded movement proportions for cosmetic purposes only
 
-  var trailDelay = 0.5, subExplosionMin = 10, subExplosionMax = 22;
+  var trailDelay = 0.5, snakeSpeed = 100, snakeTime = 5, subExplosionMin = 10, subExplosionMax = 22;
 
 
-  for (i = 0; i < frequency; i++){ // sets the frames array to 0 projectiles and to black background
+  for (i = 0; i < totalFrames; i++){ // initialize the frames array to 0 projectiles and to black background
     var projectiles = new Array ();
     frameStates[i] = new Frame(null, projectiles, "black");
   }
   for (n = 0; n < fireworks.length; n++) //sets explosion count to 0
     explosions[n] = false;
 
-  for (i = 0; i < frequency; i++){
+  for (i = 0; i < totalFrames; i++){
     time = i*period; //the timemark of the frame
-    for (n = 0; n < fireworks.length; n++){
+    for (n = 0; n < fireworks.length; n++){//checks every firwork on the fireworks object
 
       var start = (fireworks[n].begin)/1000, //the time at which the projectile starts
       lifespan = (fireworks[n].duration)/1000, //the lifespan of the projectile
@@ -66,13 +70,13 @@ function setFrames(){ //this function generates all frame states
       end = start + lifespan, //the time at which the projectile ends
       isRocket = fireworks[n].rocket,
       colour = fireworks[n].colour;
-      size = isRocket? 1.7 : 1, // the proportions the projectile on the canvas is hardcoded to 1
-      explosionTime = isRocket? 0.2 : 0.2; // the explosion time is hardcoded to 0.2 for rockets and 0.2 for fountains
+      size = isRocket? 1.7 : 1, // the proportions the projectile on the canvas is hardcoded to 1.7 for rockets and 1 for fountains
+      explosionTime = isRocket? 0.2 : 0.25; // the explosion time is hardcoded to 0.2 for rockets and 0.2 for fountains
 
       if (time >= start && time <= end){ //checks if the firework should be on canvas
 
         var x = (0)+((fireworks[n].velocity[0])*magn), //the x coordinate of the projectile
-        y = (0)+((fireworks[n].velocity[1])*magn), //the y coordinate of the projectile
+        y = (100)+((fireworks[n].velocity[1])*magn), //the y coordinate of the projectile
         type = isRocket? "rocketlike" : "fountainlike",
         p = new Projectile(type, x, y, size, colour, magn, lifespan, explosionTime);
         frameStates[i].projectiles.push(p); //add projectile to frame
@@ -123,6 +127,29 @@ function setFrames(){ //this function generates all frame states
           }
         }
         if (type == "fountainlike"){
+          var step = snakeSpeed * period, //TRABALHAR ISTO
+          snakeFrames = parseInt(lifespan / (period)); //the number of frames a snake projectile lasts
+          if (!explosions[n]){
+
+            explosions[n] = true;
+            for (k1 = 0; k1 < 10; k1++){
+              var angle = (Math.PI/4) + Math.random()*Math.PI/2,
+              spin = Math.random()*Math.PI*2,
+              sprinRadius,
+              sx = Math.cos(angle)*step,
+              sy = Math.sin(angle)*step;
+              for (k2 = 0; k2 < snakeFrames; k2++){
+                sprinRadius = 50;
+                if (k1 % 2 == 0)
+                  angle += step*2;
+                else
+                  angle -= step*2;
+                p = new Projectile("snake",  x+(sx*k2)+(Math.cos(angle)*sprinRadius), y+(sy*k2)+(Math.sin(angle)*sprinRadius), size*0.5, colour, 0, 0, 0);
+                for (k3 = 0; k3 < snakeFrames; k3++)
+                  frameStates[i+(k2)+k3].projectiles.push(p);
+              }
+            }
+          }
         }
       }
     }
@@ -144,11 +171,17 @@ function engine(){
     size = projectiles[i].size, //the size of the projectile
     colour = projectiles[i].colour;
     
+    
     if (type == "rocketlike")
       fireworkA (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
-    if (type == "trail")
+
+    if (type == "trail" || type == "snake")
       fireworkB(x, y, size, colour);
-    
+    /*
+    if (type == "fountainlike"){
+      fireworkC (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
+    }
+    */
     
   }
 
@@ -168,11 +201,10 @@ function engine(){
 
 function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
   if (presentTime <= lifespan){
-
-    var explosionTime = lifespan - explosion; // the time checkpoint at which the explosion sets off
-    var cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded particle proportions for cosmetic purposes only
-
-    if (presentTime >= explosionTime){ //if exploded
+    var explosionTime = lifespan - explosion, // the time checkpoint at which the explosion sets off
+    cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded particle proportions for cosmetic purposes only
+    if (presentTime >= explosionTime){ 
+    //if exploded
       var lightgrowth = lerp(cosmetics[0]*size, cosmetics[1]*size, ((presentTime - explosionTime)/(lifespan - explosionTime))); 
       drawGradient(x, y, lightgrowth, colour); //draws light halo / gradient
       drawLights(x, y, lightgrowth, cosmetics[2], cosmetics[3], colour);//draws light flares
@@ -180,11 +212,43 @@ function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
     else
       spawnParticles(x, y, cosmetics[4]*size, cosmetics[5]*size, cosmetics[6]*size, colour);
   }
+  else{
+    //return
+    console.log("ERROR:" + colour + " Firework type A - lifespan miscalculated");
+  }
 }
 
 function fireworkB(x, y, size, colour){
-    var cosmetics = [15, 2.25, 0.375]; //hardcoded particle proportions for cosmetic purposes only
-    spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
+  var cosmetics = [15, 2.25, 0.375]; //hardcoded particle proportions for cosmetic purposes only
+  spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
+}
+
+function fireworkC(x, y, size, presentTime, lifespan, explosionTime, colour){
+  if (presentTime <= lifespan){
+    //first explosion 
+    if (presentTime <= explosionTime)
+        spawnParticlesCircle(x, y, 20,2,5, colour);
+    //second explosion
+    if (presentTime >= explosionTime && presentTime <= explosionTime*2)
+       spawnParticlesCircle(x, y, 20*3,4,10, colour);
+    //third explosion
+    if (presentTime >= explosionTime*2 && presentTime <= explosionTime*3)
+       spawnParticlesCircle(x, y, 20*9,3,20, colour);
+    //normal state
+    if(presentTime >= explosionTime*3)
+      spawnParticlesCircle(x, y, 20*9,4,5, colour);
+      spawnParticlesCircle(x, y, 20*9,3,5, colour);
+      spawnParticlesCircle(x, y, 20*9,2,10, colour);
+  }
+  else{
+    //return
+    console.log("ERROR:" + colour + " Firework type C - lifespan miscalculated");
+  }
+}
+
+function fireworkD(x, y, size, colour){
+  var cosmetics = [15, 2.25, 2]; //hardcoded particle proportions for cosmetic purposes only
+  spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
 }
 
 //

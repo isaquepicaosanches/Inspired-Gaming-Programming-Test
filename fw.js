@@ -93,14 +93,26 @@ function drawLights (x, y, margin, blockSize, blockNr, hex){ // spawns a cluster
   }
 }
 
-function spawnParticles (x, y, margin, blockSize, blockNr, hex){ // spawns a cluster of matrixes of 9 pixels
-  var rgb = hexToRgb(hex); //converts the color from hex to RGB
-  var randX, randY;
+function spawnParticles (x, y, margin, blockSize, blockNr, hex){ // spawns a rectangular cluster of matrixes of 9 pixels
+  var rgb = hexToRgb(hex), //converts the color from hex to RGB
+  randX, randY;
   for (n = 0; n < blockNr; n++){
     randX = Math.random();
     randX = (randX*margin) - (margin/2); //a random number between -1/2 margin and 1/2 margin
     randY = Math.random();
     randY = (randY*margin) - (margin/2); //a random number between -1/2 margin and 1/2 margin
+    spawn9Pixels(blockSize,x+randX,y+randY,rgb[0],rgb[1],rgb[2]);
+  }
+}
+
+function spawnParticlesCircle (x, y, radius, blockSize, blockNr, hex){ // spawns a circular cluster of matrixes of 9 pixels
+  var rgb = hexToRgb(hex), //converts the color from hex to RGB
+  randAngle, randRadius, randX, randY;
+  for (n = 0; n < blockNr; n++){
+    randAngle = Math.random()*Math.PI*2;
+    randRadius = Math.random()*radius;
+    randX = ((Math.cos(randAngle)*randRadius)+x)-(radius/2);
+    randY = (Math.sin(randAngle)*randRadius)+y;
     spawn9Pixels(blockSize,x+randX,y+randY,rgb[0],rgb[1],rgb[2]);
   }
 }
