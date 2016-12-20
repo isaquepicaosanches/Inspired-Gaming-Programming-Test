@@ -15,126 +15,28 @@
 </div>
 
 <script>
-//read xml
-var fireworks = new Array ();
-ReadXML("fireworks.xml");
 
 //set canvas
-var c = document.getElementById("fwCanvas");
+var c = document.getElementById("fwCanvas"); 
 var width = c.width, height = c.height; // width and height of the canvas
 var canvas=c.getContext("2d");
 
+
+//global variables
+var period = 0.05, // time between frames
+frameCount = 0, //current frame
+timer = 0, //chronometer
+totalTime, //total time (set in "readXML")
+fireworks = readXML("fireworks.xml"),
+frames = setFrames();
 
 //set sprites
 var redPixel = new Image(), greenPixel = new Image(), bluePixel = new Image();
 redPixel.src = "spriteR.png";
 greenPixel.src = "spriteG.png";
 bluePixel.src = "spriteB.png";
-
-//engine
-var period = 0.05, // time between frames / fixed frame delta time
-frameCount = 0, // total frame counter
-timer = 0, //chronometer
-totalTime = 10*60, //total time
-frames = setFrames();
-
+ 
 setInterval(engine, period*1000);
-
-function engine(){
-  updateClock();
-  clearCanvas();
-
-  var projectiles = frames[frameCount].projectiles; //all projectiles on the frame
-
-  //converts projectiles on a frame into particles to be drawn on the canvas
-  for (i = 0; i < projectiles.length; i++){
-    var type = projectiles[i].type, //the type of the projectile
-    x = projectiles[i].pos[0], //the x coordinate of the projectile
-    y = projectiles[i].pos[1], //the y coordinate of the projectile
-    size = projectiles[i].size, //the size of the projectile
-    colour = projectiles[i].colour; //the color of the projectile
-    
-    if (type == "rocketlike")
-      fireworkA (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
-
-    if (type == "trail")
-      fireworkB(x, y, size, colour);
-
-    if (type == "fountainlike"){
-      fireworkC (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
-    }
-    if (type == "flame")
-      fireworkB(x, y, size, colour);
-  }
-}
-
-//
-// 
-//
-
-//draws "rocketlike"-type projectiles on the canvas
-function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
-  if (presentTime <= lifespan){
-    var explosionTime = lifespan - explosion, // the time checkpoint at which the explosion sets off
-    cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded particle proportions for cosmetic purposes only
-    if (presentTime >= explosionTime){ 
-    //if exploded
-      var lightgrowth = lerp(cosmetics[0]*size, cosmetics[1]*size, ((presentTime - explosionTime)/(lifespan - explosionTime))); 
-      drawGradient(x, y, lightgrowth, colour); //draws light halo / gradient
-      drawLights(x, y, lightgrowth, cosmetics[2], cosmetics[3], colour);//draws light flares
-    }
-    else
-      spawnParticles(x, y, cosmetics[4]*size, cosmetics[5]*size, cosmetics[6]*size, colour);
-  }
-  else{
-    console.log("ERROR:" + colour + " Firework type A - lifespan miscalculated");
-  }
-}
-
-//draws "trail"-type and "flame"-type projectiles on the canvas
-function fireworkB(x, y, size, colour){
-  var cosmetics = [15, 2.25, 0.375]; //hardcoded particle proportions for cosmetic purposes only
-  spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
-}
-
-//draws "fountainlike"-type projectiles on the canvas
-function fireworkC(x, y, size, presentTime, lifespan, explosionTime, colour){ 
-  if (presentTime <= lifespan){
-    //first explosion 
-    if (presentTime <= explosionTime)
-        spawnParticlesCircle(x, y, 20,2,5, colour);
-    //second explosion
-    if (presentTime >= explosionTime && presentTime <= explosionTime*2)
-       spawnParticlesCircle(x, y, 20*3,4,10, colour);
-    //third explosion
-    if (presentTime >= explosionTime*2 && presentTime <= explosionTime*3)
-       spawnParticlesCircle(x, y, 20*9,3,20, colour);
-    //normal state
-    if(presentTime >= explosionTime*3)
-      spawnParticlesCircle(x, y, 20*9,4,5, colour);
-      spawnParticlesCircle(x, y, 20*9,3,5, colour);
-      spawnParticlesCircle(x, y, 20*9,2,10, colour);
-  }
-  else{
-    console.log("ERROR:" + colour + " Firework type C - lifespan miscalculated");
-  }
-}
-
-//
-// MISC UTILITIES
-//
-
-function updateClock(){
-  //console.log("frame: "+frameCount+ " / time: "+timer) //for debugging
-  timer += period;
-  frameCount++;
-}
-
-function lerp(a, b, t) {
-  return (a + t * (b - a));
-}
-
-
 
 
 </script>

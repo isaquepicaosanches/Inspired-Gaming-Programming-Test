@@ -14,12 +14,13 @@
 
   //the projectile object
   function Projectile (p, x, y, s, c, t, tM, tE){
-    this.type = p; // the projectile type
+    this.type = p;
     //there's 4 types of projectiles:
     // "rocketlike"
     // "fountainlike"
     // "trail"
     // "flame"
+
     this.pos = [x, y]; //the coordinates of the projectile
     this.size = s; // the size of the projectile
     this.colour = c; // the color of the projectile
@@ -43,7 +44,8 @@ function lerp(a, b, t) {
   return (a + t * (b - a));
 }
 
-function hexToRgb(hex) { //converts hexadecimal to RGB using right shifts
+//converts hexadecimal to RGB using right shifts
+function hexToRgb(hex) {
     var bigint = parseInt(hex, 16);
     var r = (bigint >> 16) & 255; 
     var g = (bigint >> 8) & 255;
@@ -55,37 +57,46 @@ function hexToRgb(hex) { //converts hexadecimal to RGB using right shifts
 // XML FUNCTIONS BELOW
 //
 
-  // reads the XML and saves it as a firework array
-  function ReadXML(filename){
+// reads the XML and saves it as a firework array
+function readXML(filename){
+    
   	var Connect = new XMLHttpRequest();
   	Connect.open("GET", filename, false);
   	Connect.send();
+    var xml = Connect.responseXML,
+    xmlFireworks = xml.getElementsByTagName("Firework"),
 
-    var xml = Connect.responseXML;
-    var xmlFireworks = xml.getElementsByTagName("Firework");
+    fireworkList = new Array(), //an array which contains the info of all fireworks in the XML
+    canvasTime = 0; //the total duration of the animation
 
     for (n = 0; n < xmlFireworks.length; n++){
       var f = xmlFireworks[n];
-      var isRocket = (f.getAttribute('type')) == "Rocket"; //if the firework is a rocket
-      var begin = f.getAttribute('begin'); //starting time
-      var col = f.getAttribute('colour'); //the colour of the firework
-      var dur = f.getAttribute('duration'); //lifespan
+      var isRocket = (f.getAttribute('type')) == "Rocket"; //can be expanded upon & changed to non-boolean if firework types are > 2
+      var begin = f.getAttribute('begin'); 
+      var colour = f.getAttribute('colour'); 
+      var duration = f.getAttribute('duration');
+
+      if (begin + duration > canvasTime)
+        canvasTime = (begin * 1) + (duration * 1);
 
       var pos = new Array(); // the starting position of the firework
-      pos[0] = f.getElementsByTagName("Position")[0].getAttribute('x');
+      pos[0] = f.getElementsByTagName("Position")[0].getAttribute('x'),
       pos[1] = f.getElementsByTagName("Position")[0].getAttribute('y');
      
      var vel = new Array(); // the speed of the firework
       if (isRocket){
-        vel[0] = f.getElementsByTagName("Velocity")[0].getAttribute('x');
+        vel[0] = f.getElementsByTagName("Velocity")[0].getAttribute('x'),
         vel[1] = f.getElementsByTagName("Velocity")[0].getAttribute('y');
       }
       else
         vel = [0,0];
-
-      fireworks[n] = new Firework (isRocket,begin,col,dur,pos,vel);
+      fireworkList[n] = new Firework (isRocket,begin,colour,duration,pos,vel);
     }
-  }
+
+    totalTime = (canvasTime/1000) + 5; //global variable
+    console.log(totalTime);
+    return fireworkList; 
+}
 
 //
 //CANVAS FUNCTIONS BELOW
@@ -96,16 +107,15 @@ function hexToRgb(hex) { //converts hexadecimal to RGB using right shifts
 function engine(){ //is called every 'period' seconds
   updateClock(); 
   clearCanvas();
-
   var projectiles = frames[frameCount].projectiles; //all projectiles on the frame
 
   //converts projectiles on a frame into particles to be drawn on the canvas
   for (i = 0; i < projectiles.length; i++){
-    var type = projectiles[i].type, //the type of the projectile
+    var type = projectiles[i].type, 
     x = projectiles[i].pos[0], //the x coordinate of the projectile
     y = projectiles[i].pos[1], //the y coordinate of the projectile
-    size = projectiles[i].size, //the size of the projectile
-    colour = projectiles[i].colour; //the color of the projectile
+    size = projectiles[i].size, 
+    colour = projectiles[i].colour;
     
     if (type == "rocketlike")
       fireworkA (x, y, size, projectiles[i].time, projectiles[i].lifespan, projectiles[i].explosionTime,colour);
@@ -122,9 +132,10 @@ function engine(){ //is called every 'period' seconds
 }
 
 function updateClock(){
-  //console.log("frame: "+frameCount+ " / time: "+timer) //for debugging
   timer += period;
   frameCount++;
+  if (frames[frameCount] == undefined)
+    frameCount = 0;
 }
 
 //sets the canvas color
@@ -139,9 +150,10 @@ function clearCanvas(){
 function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
   if (presentTime <= lifespan){
     var explosionTime = lifespan - explosion, // the time checkpoint at which the explosion sets off
-    cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded particle proportions for cosmetic purposes only
+    cosmetics = [20, 300, 15, 5, 10.5, 2.33, 14]; //hardcoded proportions for cosmetic purposes only
+    
+    //when explodes
     if (presentTime >= explosionTime){ 
-    //if exploded
       var lightgrowth = lerp(cosmetics[0]*size, cosmetics[1]*size, ((presentTime - explosionTime)/(lifespan - explosionTime))); 
       drawGradient(x, y, lightgrowth, colour); //draws light halo / gradient
       drawLights(x, y, lightgrowth, cosmetics[2], cosmetics[3], colour);//draws light flares
@@ -156,27 +168,32 @@ function fireworkA(x, y, size, presentTime, lifespan, explosion, colour){
 
 //draws "trail"-type and "flame"-type projectiles on the canvas
 function fireworkB(x, y, size, colour){
-  var cosmetics = [15, 2.25, 0.375]; //hardcoded particle proportions for cosmetic purposes only
+  var cosmetics = [15, 2.25, 0.375]; //hardcoded proportions for cosmetic purposes only
   spawnParticles(x, y, size*cosmetics[0], size*cosmetics[1], size*cosmetics[2], colour);
 }
 
 //draws "fountainlike"-type projectiles on the canvas
-function fireworkC(x, y, size, presentTime, lifespan, explosionTime, colour){ 
+function fireworkC(x, y, size, presentTime, lifespan, explosionTime, colour){
+  var cosmetics = [20, 2, 3, 4, 5]; //hardcoded proportions for cosmetic purposes only
   if (presentTime <= lifespan){
+
     //first explosion 
     if (presentTime <= explosionTime)
-        spawnParticlesCircle(x, y, 20,2,5, colour);
+        spawnParticlesCircle(x, y, cosmetics[0], cosmetics[1], cosmetics[4], colour);
+
     //second explosion
     if (presentTime >= explosionTime && presentTime <= explosionTime*2)
-       spawnParticlesCircle(x, y, 20*3,4,10, colour);
+       spawnParticlesCircle(x, y, cosmetics[0]*3, cosmetics[3], cosmetics[4]*2, colour);
+
     //third explosion
     if (presentTime >= explosionTime*2 && presentTime <= explosionTime*3)
-       spawnParticlesCircle(x, y, 20*9,3,20, colour);
+       spawnParticlesCircle(x, y, cosmetics[0]*9, cosmetics[2], cosmetics[4]*4, colour);
+
     //normal state
     if(presentTime >= explosionTime*3)
-      spawnParticlesCircle(x, y, 20*9,4,5, colour);
-      spawnParticlesCircle(x, y, 20*9,3,5, colour);
-      spawnParticlesCircle(x, y, 20*9,2,10, colour);
+      spawnParticlesCircle(x, y, cosmetics[0]*9, cosmetics[3], cosmetics[4], colour);
+      spawnParticlesCircle(x, y, cosmetics[0]*9, cosmetics[2], cosmetics[4], colour);
+      spawnParticlesCircle(x, y, cosmetics[0]*9, cosmetics[1], cosmetics[4]*2, colour);
   }
   else{
     console.log("ERROR:" + colour + " Firework type C - lifespan miscalculated");
