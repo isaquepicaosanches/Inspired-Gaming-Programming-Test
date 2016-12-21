@@ -26,17 +26,17 @@ var canvas=c.getContext("2d");
 var period = 0.05, // time between frames
 frameCount = 0, //current frame
 timer = 0, //chronometer
-totalTime, //total time (set in "readXML")
-fireworks = readXML("fireworks.xml"),
-frames = setFrames();
+totalTime = 0, //total animation time
+fireworks = null,
+frames;
 
 //set sprites
 var redPixel = new Image(), greenPixel = new Image(), bluePixel = new Image();
 redPixel.src = "spriteR.png";
 greenPixel.src = "spriteG.png";
 bluePixel.src = "spriteB.png";
- 
-setInterval(engine, period*1000);
+
+readXML("fireworks.xml");
 
 
 </script>

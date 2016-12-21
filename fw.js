@@ -57,45 +57,66 @@ function hexToRgb(hex) {
 // XML FUNCTIONS BELOW
 //
 
-// reads the XML and saves it as a firework array
+// reads the XML, saves it as a firework array, calls "setFrames()" and "engine functions"
 function readXML(filename){
-    
-  	var Connect = new XMLHttpRequest();
-  	Connect.open("GET", filename, false);
-  	Connect.send();
-    var xml = Connect.responseXML,
-    xmlFireworks = xml.getElementsByTagName("Firework"),
 
-    fireworkList = new Array(), //an array which contains the info of all fireworks in the XML
-    canvasTime = 0; //the total duration of the animation
+  var XMLHttpR = new XMLHttpRequest();
+  XMLHttpR.open('GET', filename, true);
+  XMLHttpR.responseType = 'document';
+  XMLHttpR.overrideMimeType('text/xml');
 
-    for (n = 0; n < xmlFireworks.length; n++){
-      var f = xmlFireworks[n];
-      var isRocket = (f.getAttribute('type')) == "Rocket"; //can be expanded upon & changed to non-boolean if firework types are > 2
-      var begin = f.getAttribute('begin'); 
-      var colour = f.getAttribute('colour'); 
-      var duration = f.getAttribute('duration');
-
-      if (begin + duration > canvasTime)
-        canvasTime = (begin * 1) + (duration * 1);
-
-      var pos = new Array(); // the starting position of the firework
-      pos[0] = f.getElementsByTagName("Position")[0].getAttribute('x'),
-      pos[1] = f.getElementsByTagName("Position")[0].getAttribute('y');
-     
-     var vel = new Array(); // the speed of the firework
-      if (isRocket){
-        vel[0] = f.getElementsByTagName("Velocity")[0].getAttribute('x'),
-        vel[1] = f.getElementsByTagName("Velocity")[0].getAttribute('y');
+  XMLHttpR.onload = function () {
+    if (XMLHttpR.readyState == 4 && XMLHttpR.status == 200) {
+      //error messages
+      if (XMLHttpR.responseXML == null){
+        console.log("ERROR: responseXML is null");
+        return;
       }
-      else
-        vel = [0,0];
-      fireworkList[n] = new Firework (isRocket,begin,colour,duration,pos,vel);
-    }
+      var xmlFireworks = XMLHttpR.responseXML.getElementsByTagName("Firework"); 
+      if (xmlFireworks == null){
+        console.log("ERROR: XML contains no Fireworks");
+        return;
+      }
 
-    totalTime = (canvasTime/1000) + 5; //global variable
-    console.log(totalTime);
-    return fireworkList; 
+      fireworkList = new Array(), //an array which contains the info of all fireworks in the XML
+      canvasTime = 0; //the total duration of the animation
+      for (n = 0; n < xmlFireworks.length; n++){
+          var f = xmlFireworks[n],
+          isRocket = (f.getAttribute('type')) == "Rocket", //can be expanded upon & changed to non-boolean if firework types are > 2
+          begin = f.getAttribute('begin'),
+          colour = f.getAttribute('colour'),
+          duration = f.getAttribute('duration');
+
+          if (begin + duration > canvasTime)
+            canvasTime = (begin * 1) + (duration * 1);
+
+          var pos = new Array(); // the starting position of the firework
+          pos[0] = f.getElementsByTagName("Position")[0].getAttribute('x'),
+          pos[1] = f.getElementsByTagName("Position")[0].getAttribute('y');
+         
+         var vel = new Array(); // the speed of the firework
+          if (isRocket){
+            vel[0] = f.getElementsByTagName("Velocity")[0].getAttribute('x'),
+            vel[1] = f.getElementsByTagName("Velocity")[0].getAttribute('y');
+          }
+          else
+            vel = [0,0];
+          fireworkList[n] = new Firework (isRocket,begin,colour,duration,pos,vel);
+        }
+
+      //global variables
+      totalTime = (canvasTime/1000) + 5;// note: adds a 5s delay before looping
+      fireworks = fireworkList;
+      console.log("animation time: "+ totalTime);
+
+      frames = setFrames();
+      setInterval(engine, period*1000);
+    }
+    else
+      console.log("ERROR: XMLHttpRequest unsucessful"); 
+  };
+
+  XMLHttpR.send(null);
 }
 
 //
@@ -107,13 +128,13 @@ function readXML(filename){
 function engine(){ //is called every 'period' seconds
   updateClock(); 
   clearCanvas();
+
   var projectiles = frames[frameCount].projectiles; //all projectiles on the frame
 
   //converts projectiles on a frame into particles to be drawn on the canvas
   for (i = 0; i < projectiles.length; i++){
     var type = projectiles[i].type, 
-    x = projectiles[i].pos[0], //the x coordinate of the projectile
-    y = projectiles[i].pos[1], //the y coordinate of the projectile
+    x = projectiles[i].pos[0], y = projectiles[i].pos[1], //the coordinates of the projectile
     size = projectiles[i].size, 
     colour = projectiles[i].colour;
     
@@ -134,8 +155,12 @@ function engine(){ //is called every 'period' seconds
 function updateClock(){
   timer += period;
   frameCount++;
-  if (frames[frameCount] == undefined)
+
+  //loops the animation
+  if (timer > totalTime){
     frameCount = 0;
+    timer = 0;
+  }
 }
 
 //sets the canvas color
@@ -202,18 +227,8 @@ function fireworkC(x, y, size, presentTime, lifespan, explosionTime, colour){
 
 // PARTICLES
 
-function drawGradient(posX, posY, size, color){//draws a colored gradient
-  var rgb = hexToRgb(color); //converts hexadecimal to RGB
-  posX = ((width/2) +posX); //the element is centered horizontally
-  posY = (height - posY); // the element is positioned bottom-up vertically
-  var grd = canvas.createRadialGradient(posX, posY, 1, posX, posY, size/2);
-  grd.addColorStop(0, 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',1)');
-  grd.addColorStop(1, 'rgba(0,0,0,0)');
-  canvas.fillStyle = grd;
-  canvas.fillRect(0, 0, width, height);
-}
-
-function drawLights (x, y, margin, blockSize, blockNr, hex){ // spawns a cluster of matrixes of 9 pixels
+//spawns a cluster of colored gradients
+function drawLights (x, y, margin, blockSize, blockNr, hex){
   var randX, randY;
   for (n = 0; n < blockNr; n++){
     randX = Math.random();
@@ -224,7 +239,20 @@ function drawLights (x, y, margin, blockSize, blockNr, hex){ // spawns a cluster
   }
 }
 
-function spawnParticles (x, y, margin, blockSize, blockNr, hex){ // spawns a rectangular cluster of matrixes of 9 pixels
+//draws a colored gradient
+function drawGradient(posX, posY, size, color){
+  var rgb = hexToRgb(color); //converts hexadecimal to RGB
+  posX = ((width/2) +posX); //the element is centered horizontally
+  posY = (height - posY); // the element is positioned bottom-up vertically
+  var grd = canvas.createRadialGradient(posX, posY, 1, posX, posY, size/2);
+  grd.addColorStop(0, 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',1)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  canvas.fillStyle = grd;
+  canvas.fillRect(0, 0, width, height);
+}
+
+//spawns a rectangular cluster of matrixes of 9 pixels
+function spawnParticles (x, y, margin, blockSize, blockNr, hex){
   var rgb = hexToRgb(hex), //converts the color from hex to RGB
   randX, randY;
   for (n = 0; n < blockNr; n++){
@@ -236,7 +264,8 @@ function spawnParticles (x, y, margin, blockSize, blockNr, hex){ // spawns a rec
   }
 }
 
-function spawnParticlesCircle (x, y, radius, blockSize, blockNr, hex){ // spawns a circular cluster of matrixes of 9 pixels
+//spawns a circular cluster of matrixes of 9 pixels
+function spawnParticlesCircle (x, y, radius, blockSize, blockNr, hex){
   var rgb = hexToRgb(hex), //converts the color from hex to RGB
   randAngle, randRadius, randX, randY;
   for (n = 0; n < blockNr; n++){
@@ -248,7 +277,8 @@ function spawnParticlesCircle (x, y, radius, blockSize, blockNr, hex){ // spawns
   }
 }
 
-function spawn9Pixels (u, x, y, r, g, b){//spawns a matrix of 9 pixels
+//spawns a matrix of 9 pixels
+function spawn9Pixels (u, x, y, r, g, b){
   spawnPixel(getPixel(r,g,b), x+(u/2),y-(u/2),u,u); // position (1,1)
   spawnPixel(getPixel(r,g,b), x,y,u,u); // position (1,2)
   spawnPixel(getPixel(r,g,b), x-(u/2),y+(u/2),u,u); //position (1,3)
@@ -260,15 +290,17 @@ function spawn9Pixels (u, x, y, r, g, b){//spawns a matrix of 9 pixels
   spawnPixel(getPixel(r,g,b), x+(u/2),y+u+(u/2),u,u); // position (3,3)
 }
 
-function spawnPixel(img, posX, posY, sizeX, sizeY) {//draws an instance of an image
+//draws an instance of an image
+function spawnPixel(img, posX, posY, sizeX, sizeY) {
     posX = ((width/2) +posX)-(sizeX/2); //the element is centered horizontally
     posY = (height - posY)-sizeY; // the element is positioned bottom-up vertically
     canvas.drawImage(img,posX,posY,sizeX,sizeY);
 }
 
-function getPixel(r,g,b){//returns a random red blue or green sprite based on the RGB probability 
-  var rand = Math.random(); //a random number between 1 and 0
-  rand *= (r+g+b); // a random number between 0 and the sum of all color values
+//returns a random red blue or green sprite based on the RGB probability 
+function getPixel(r,g,b){
+  var rand = Math.random();
+  rand *= (r+g+b); 
   if (rand < r)
     return redPixel;
   if (rand >= r && rand < r+g)
@@ -292,7 +324,7 @@ function setFrames(){ //this function generates all frame states
 
   var trailDelay = 0.5, subExplosionMin = 10, subExplosionMax = 22;
 
-  //initializes the frames array to 0 projectiles and to black background
+  //initializes the frames array: 0 projectiles & black background
   for (i = 0; i < totalFrames; i++){
     var projectiles = new Array ();
     frameStates[i] = new Frame(null, projectiles, "black");
@@ -308,8 +340,8 @@ function setFrames(){ //this function generates all frame states
     for (n = 0; n < fireworks.length; n++){//checks every firwork on the fireworks object
 
       //firework stats
-      var start = (fireworks[n].begin) / 1000, //the time at which the projectile starts
-      lifespan = (fireworks[n].duration) / 1000, //the lifespan of the projectile
+      var start = (fireworks[n].begin) / 1000,
+      lifespan = (fireworks[n].duration) / 1000,
       magn = time - start, // the lifetime of the projectile / the magnitude travelled by the projectile
       end = start + lifespan, //the time at which the projectile ends
       isRocket = fireworks[n].rocket,
@@ -319,8 +351,13 @@ function setFrames(){ //this function generates all frame states
 
       //checks when the firework should be on canvas
       if (time >= start && time <= end){
-        var x = (1 * fireworks[n].position[0]) + ((fireworks[n].velocity[0]) * magn), //the x coordinate of the projectile
-        y = ((1 * fireworks[n].position[1]) + (height/2) ) + ((fireworks[n].velocity[1]) * magn), //the y coordinate of the projectile
+
+        //the x coordinate of the projectile
+        var x = (1 * fireworks[n].position[0]) + ((fireworks[n].velocity[0]) * magn),
+
+        //the y coordinate of the projectile
+        //note: vertical coordinates are converted to a framework in which y = 0 is the bottom of the canvas
+        y = ((1 * fireworks[n].position[1]) + (height/2) ) + ((fireworks[n].velocity[1]) * magn),
 
         //a firework is a set of projectiles.
         //a projectile is a set of particles.
@@ -365,12 +402,15 @@ function setFrames(){ //this function generates all frame states
                 //subexplosion projectiles and their trails
                 for (k1 = 0; k1 < subExplosionNR; k1++){
                     var angle = Math.PI*Math.random()*2, // subexplsion projectile direction is random in 360º
-                    sx = Math.cos(angle)*vMagn*period*cosmetics[1], //subexplosion projectiles horizontal speed
-                    sy = Math.sin(angle)*vMagn*period*cosmetics[1]; //subexplosion projectlies vertical speed
                     
+                    //subexplosion projectiles speed
+                    sx = Math.cos(angle)*vMagn*period*cosmetics[1], 
+                    sy = Math.sin(angle)*vMagn*period*cosmetics[1];              
                     for (k2 = 1; k2 <= subExplosionLength; k2++){
-                      var tx = sx * k2, //the horizontal distance between the projectile and the explosion
-                      ty = sy * k2; //the horizontal distance between the projectile and the explosion
+
+                      //the distance between the projectile and the explosion
+                      var tx = sx * k2, 
+                      ty = sy * k2;
 
                       //subexplosions
                       p = new Projectile(type,  x+tx, y+ty, size*cosmetics[2], colour, 0, 1, 0); 
@@ -391,13 +431,15 @@ function setFrames(){ //this function generates all frame states
                 subExplosionNR = parseInt(lerp(subExplosionMin,subExplosionMax,Math.random())); //random number falling subprojectiles
                 for (k1 = 0; k1 < subExplosionNR; k1++){
                     angle = -Math.PI*Math.random(), // falling subprojectiles only go downwards (180º to 360º)
-                    sx = Math.cos(angle) * vMagn * period * cosmetics[4], //falling subprojectlies vertical speed
-                    sy = Math.sin(angle) * vMagn * period * cosmetics[4]; //falling subprojectlies vertical speed
-                    
-                    for (k2 = 1; k2 <= subExplosionLength; k2++){
-                      var tx = sx * k2, //the horizontal distance between the projectile and the explosion
-                      ty = sy * k2; //the horizontal distance between the projectile and the explosion
 
+                    //falling subprojectlies speed
+                    sx = Math.cos(angle) * vMagn * period * cosmetics[4], 
+                    sy = Math.sin(angle) * vMagn * period * cosmetics[4];                    
+                    for (k2 = 1; k2 <= subExplosionLength; k2++){
+
+                      //the distance between the projectile and the explosion
+                      var tx = sx * k2,
+                      ty = sy * k2;
                       p = new Projectile(type,  x+tx, y+ty, size*cosmetics[5], colour, 0, 1, 0);
                       frameStates[i+k2].projectiles.push(p);
                     }
@@ -408,19 +450,24 @@ function setFrames(){ //this function generates all frame states
             explosions[n] = true;
 
             //flame projectiles
-            var flameFrames = parseInt(lifespan / (period)); //the number of frames a flame projectile lasts
+            var flameFrames = parseInt((lifespan * 0.9) / (period)); //the number of frames a flame projectile lasts
+            //note: flames end 10% earlier before the rest the fountain particles
+
             for (k1 = 0; k1 < 10; k1++){
               var Ampl = 1/5; //the amplitude of the flames as a fraction of Pi radians (hardcoded)
               angle = Math.random() * Math.PI * (Ampl) + Math.PI*(1-(Ampl))/2,
-              sx = Math.cos(angle) * cosmetics[6] * size, //the horizontal direction and distance (in pixels) between flame particles
-              sy = Math.sin(angle) * cosmetics[6] * size; //the vertical direction and distance (in pixels) between flame particles
+
+              //the direction and distance (in pixels) between flame particles
+              sx = Math.cos(angle) * cosmetics[6] * size,
+              sy = Math.sin(angle) * cosmetics[6] * size;
 
               //draws flame projectiles in every frame of the fountain lifespan
               for (k2 = 0; k2 < flameFrames; k2++){
                 var flameSize = parseInt((0.5 + (Math.random() * 0.5)) * cosmetics[7] * size); //the number of particles of a flame projectile
                 for (k3 = 0; k3 < flameSize; k3++){
-                  var tx = sx * k3, //the horizontal distance between the projectile and the firework
-                  ty = sy * k3; //the vertical distance between the projectile and the firework
+                  //the distance between the projectile and the firework
+                  var tx = sx * k3, 
+                  ty = sy * k3;
                   p = new Projectile("flame", x+tx, y+ty, size, colour, 0, 0, 0);
                   frameStates[i+(k2)].projectiles.push(p);
                 }
