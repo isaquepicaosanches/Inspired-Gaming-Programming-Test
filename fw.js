@@ -315,9 +315,8 @@ function getPixel(r,g,b){
 
 function setFrames(){ //this function generates all frame states
 
-  //this solution for particle GFX generates every frame beforehand
-  //the function returns a description of every frame, to later be rendered on a HTML5 canvas
-  //this approach is a workaround to prevent slowdown
+  //this GFX solution sets every frame beforehand
+  //the function returns the state of every frame (to later be rendered on a HTML5 canvas)
 
   var frameStates = new Array(),  explosions = new Array(),  totalFrames = parseInt(totalTime / period),
   cosmetics = [2, 1.5, 0.59, 0.77, 0.33, 0.4, 10, 30];//hardcoded movement proportions for cosmetic purposes only
@@ -346,8 +345,8 @@ function setFrames(){ //this function generates all frame states
       end = start + lifespan, //the time at which the projectile ends
       isRocket = fireworks[n].rocket,
       colour = fireworks[n].colour;
-      size = isRocket? 1.7 : 0.8, // the proportions the projectile on the canvas is hardcoded to 1.7 for rockets and 1 for fountains
-      explosionTime = isRocket? 0.2 : 0.25; // the explosion time is hardcoded to 0.2 for rockets and 0.25 for fountains
+      size = isRocket? 1.7 : 0.8, // projectile proportions for both firework types (hardcoded)
+      explosionTime = isRocket? 0.2 : 0.25; // explosion time for both firework types (hardcoded)
 
       //checks when the firework should be on canvas
       if (time >= start && time <= end){
@@ -361,7 +360,6 @@ function setFrames(){ //this function generates all frame states
 
         //a firework is a set of projectiles.
         //a projectile is a set of particles.
-
         //projectiles are sorted into 4 types:
         // - "rocketlike"
         // - "fountainlike"
@@ -381,27 +379,59 @@ function setFrames(){ //this function generates all frame states
         p = new Projectile(type, x, y, size, colour, magn, lifespan, explosionTime);
         frameStates[i].projectiles.push(p); //add projectile to frame
 
-        if (type == "rocketlike"){
+        //flame projectiles
+        if (!isRocket && !explosions[n]){
+          explosions[n] = true;
 
-          //draws a main trail for the rocket projectile
+          var flameFrames = parseInt((lifespan * 0.9) / (period)); //the number of frames a flame projectile lasts
+          //note: flames end 10% earlier before the rest the fountain particles
+
+          for (k1 = 0; k1 < 10; k1++){
+            var ampl = 1/5; //the amplitude of the flames as a fraction of Pi radians (hardcoded)
+            angle = Math.random() * Math.PI * (ampl) + Math.PI*(1-(ampl))/2,
+
+            //the direction and distance (in pixels) between flame particles
+            sx = Math.cos(angle) * cosmetics[6] * size,
+            sy = Math.sin(angle) * cosmetics[6] * size;
+
+            //draws flame projectiles in every frame of the fountain lifespan
+            for (k2 = 0; k2 < flameFrames; k2++){
+              var flameSize = parseInt((0.5 + (Math.random() * 0.5)) * cosmetics[7] * size); //the number of particles of a flame projectile
+              for (k3 = 0; k3 < flameSize; k3++){
+
+              //the distance between the projectile and the firework
+              var tx = sx * k3, 
+              ty = sy * k3;
+                  
+              p = new Projectile("flame", x+tx, y+ty, size, colour, 0, 0, 0);
+              frameStates[i+(k2)].projectiles.push(p);
+              }
+            }
+          }       
+        }
+
+        //trail, subexplosions & falling projectiles
+        if (isRocket){
+
           var trailLength = parseInt(trailDelay / period);//number of frames for trail
-          for (t = 1; t <= trailLength; t++){//sets rocket trail
+          for (t = 1; t <= trailLength; t++){
             p = new Projectile("trail", x, y, size, colour, 0, 0, 0);
-            frameStates[i+t].projectiles.push(p); //add projectile to later frames
+
+            //draws a trail for the main rocket projectile
+            frameStates[i+t].projectiles.push(p);
           }
 
           if (time >= end - explosionTime && !explosions[n]){
-                explosions[n] = true; //rocket has exploded
-                frameStates[i].backgroundColor = "white"; //sets the canvas background to white in this frame
+                explosions[n] = true;
+                frameStates[i].backgroundColor = "white"; //sets the canvas background to white when rocket explodes
 
                 var vMagn = Math.sqrt( Math.pow(fireworks[n].velocity[0], 2) + Math.pow(fireworks[n].velocity[1], 2) ), // magnitude of rocket velocity
-                subExplosionNR = parseInt(lerp(subExplosionMin,subExplosionMax,Math.random())); //random number of subexplosions after the rocket explodes
-
-                var subExplosionLength = trailLength*cosmetics[0];//subexplosion variables
+                subExplosionNR = parseInt( lerp(subExplosionMin, subExplosionMax, Math.random()) ), //random number of subexplosions
+                subExplosionLength = parseInt(trailLength * cosmetics[0]); // frames of subexplosion trail
 
                 //subexplosion projectiles and their trails
                 for (k1 = 0; k1 < subExplosionNR; k1++){
-                    var angle = Math.PI*Math.random()*2, // subexplsion projectile direction is random in 360º
+                    var angle = Math.PI*Math.random()*2, // note: subexplsion projectile direction is random in 360º
                     
                     //subexplosion projectiles speed
                     sx = Math.cos(angle)*vMagn*period*cosmetics[1], 
@@ -418,7 +448,7 @@ function setFrames(){ //this function generates all frame states
 
                       //subexplosion trail
                       p = new Projectile("trail",  x+tx, y+ty, size*cosmetics[2], colour, 0, 1, 0); 
-                      for (k3 = 1; k3 <= trailLength/3; k3++)
+                      for (k3 = 1; k3 <= parseInt(trailLength * cosmetics[4]); k3++)
                         frameStates[i+k2+k3].projectiles.push(p);
 
                       //cosmetic trail ray
@@ -445,34 +475,6 @@ function setFrames(){ //this function generates all frame states
                     }
                 }        
           }
-        }
-        if (type == "fountainlike" && !explosions[n]){
-            explosions[n] = true;
-
-            //flame projectiles
-            var flameFrames = parseInt((lifespan * 0.9) / (period)); //the number of frames a flame projectile lasts
-            //note: flames end 10% earlier before the rest the fountain particles
-
-            for (k1 = 0; k1 < 10; k1++){
-              var Ampl = 1/5; //the amplitude of the flames as a fraction of Pi radians (hardcoded)
-              angle = Math.random() * Math.PI * (Ampl) + Math.PI*(1-(Ampl))/2,
-
-              //the direction and distance (in pixels) between flame particles
-              sx = Math.cos(angle) * cosmetics[6] * size,
-              sy = Math.sin(angle) * cosmetics[6] * size;
-
-              //draws flame projectiles in every frame of the fountain lifespan
-              for (k2 = 0; k2 < flameFrames; k2++){
-                var flameSize = parseInt((0.5 + (Math.random() * 0.5)) * cosmetics[7] * size); //the number of particles of a flame projectile
-                for (k3 = 0; k3 < flameSize; k3++){
-                  //the distance between the projectile and the firework
-                  var tx = sx * k3, 
-                  ty = sy * k3;
-                  p = new Projectile("flame", x+tx, y+ty, size, colour, 0, 0, 0);
-                  frameStates[i+(k2)].projectiles.push(p);
-                }
-              }
-            }       
         }
       }
     }
